@@ -145,8 +145,8 @@ export function fmtNyHm(t: number): string {
   return NY_HM.format(t);
 }
 
-/** "2026-10-27" → epoch ms at UTC midnight. */
+/** "2026-10-27" → epoch ms at UTC midnight; NaN for anything else (e.g. "Q4 2026"). */
 export function isoDay(date: string): number {
-  const [y, m, d] = date.split("-").map(Number);
-  return Date.UTC(y, m - 1, d);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  return m ? Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : NaN;
 }

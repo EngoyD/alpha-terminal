@@ -30,9 +30,17 @@ jobs:
 
       - run: npm ci
 
+      - name: Lint, typecheck and test
+        run: |
+          npm run lint
+          npm run typecheck
+          npm test
+
       - run: npm run build:static
         env:
           PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+          # Report API on the Vercel deployment (live Claude reports). Unset: in-browser mock reports.
+          NEXT_PUBLIC_REPORT_API: ${{ vars.REPORT_API_URL }}
 
       - uses: actions/upload-pages-artifact@v5
         with:

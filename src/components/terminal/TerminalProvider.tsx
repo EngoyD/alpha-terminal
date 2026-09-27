@@ -11,8 +11,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { requestAIReport } from "@/lib/ai/client";
-import { MOCK_MODEL, STATIC_EXPORT } from "@/lib/ai/config";
+import { reportLockedUntil, requestAIReport } from "@/lib/ai/client";
+import { MOCK_MODEL, REPORT_API, STATIC_EXPORT } from "@/lib/ai/config";
 import type { AIReportEnvelope } from "@/lib/ai/schema";
 import { COMPANIES, DEFAULT_SELECTED, DEFAULT_WATCHLIST, isCovered } from "@/lib/data/companies";
 import { rankDiscovery } from "@/lib/discovery";
@@ -29,6 +29,8 @@ export interface AIInfo {
   provider: string;
   model: string;
 }
+
+const MOCK_INFO: AIInfo = { provider: "mock", model: MOCK_MODEL };
 
 /** Minimum time the terminal-style loading sequence stays on screen. */
 export const MIN_REPORT_MS = 3400;
@@ -110,7 +112,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   const [watchlist, setWatchlist] = useState(prefs.watchlist);
   const [selected, setSelected] = useState(prefs.selected);
   const [reports, setReports] = useState<Record<string, ReportState>>({});
-  const [aiInfo, setAiInfo] = useState<AIInfo | null>(STATIC_EXPORT ? { provider: "mock", model: MOCK_MODEL } : null);
+  const [aiInfo, setAiInfo] = useState<AIInfo | null>(REPORT_API ? null : MOCK_INFO);
   const [scanSeed, setScanSeed] = useState(1);
   const [scanning, setScanning] = useState(false);
   const [wire, setWire] = useState<Record<string, NewsItem[]>>({});
@@ -122,6 +124,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     latencyMs: 12,
   }));
   const inflight = useRef(new Set<string>());
+  const reportsRef = useRef(reports);
   const scanTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Simulated market feed.
@@ -153,20 +156,29 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(id);
   }, []);
 
-  // Which provider/model the report route is configured for. Static builds have no route.
+  // Which provider/model the report API is configured for.
   useEffect(() => {
-    if (STATIC_EXPORT) return;
+    if (!REPORT_API) return;
     const controller = new AbortController();
-    fetch("/api/ai-report", { signal: controller.signal })
+    fetch(REPORT_API, { signal: controller.signal })
       .then((res) => (res.ok ? res.json() : null))
       .then((info: unknown) => {
         if (info && typeof info === "object" && "provider" in info && "model" in info) {
           setAiInfo({ provider: String(info.provider), model: String(info.model) });
+        } else if (STATIC_EXPORT) {
+          setAiInfo(MOCK_INFO);
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        // A static build that can't reach the API generates mock reports locally.
+        if (STATIC_EXPORT && !controller.signal.aborted) setAiInfo(MOCK_INFO);
+      });
     return () => controller.abort();
   }, []);
+
+  useEffect(() => {
+    reportsRef.current = reports;
+  }, [reports]);
 
   useEffect(() => {
     try {
@@ -198,6 +210,9 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
 
   const generateReport = useCallback((ticker: string) => {
     if (!isCovered(ticker) || inflight.current.has(ticker)) return;
+    // Live reports are shared and cached server-side; regenerating early would return the same one.
+    const current = reportsRef.current[ticker];
+    if (current?.status === "ready" && reportLockedUntil(current.envelope, Date.now()) !== null) return;
     inflight.current.add(ticker);
     const startedAt = Date.now();
     setReports((r) => ({ ...r, [ticker]: { status: "loading", startedAt } }));

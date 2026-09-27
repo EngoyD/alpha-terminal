@@ -69,6 +69,10 @@ export const AIReportEnvelopeSchema = z.object({
     model: z.string(),
     generatedAt: z.string(),
     latencyMs: z.number(),
+    /** True when the server returned a previously generated report. */
+    cached: z.boolean(),
+    /** When a shared cached report may be regenerated; null for uncached providers. */
+    cachedUntil: z.string().nullable(),
   }),
 });
 

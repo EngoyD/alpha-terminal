@@ -159,7 +159,12 @@ function MoatSection({ business }: { business: AIReport["business"] }) {
 
 function CatalystSection({ catalysts }: { catalysts: AIReport["catalysts"] }) {
   const now = useNow();
-  const events = [...catalysts.events].sort((a, b) => isoDay(a.date) - isoDay(b.date));
+  // Undated or approximate entries (e.g. "Q4 2026" from a model) sort last.
+  const sortKey = (date: string) => {
+    const t = isoDay(date);
+    return Number.isFinite(t) ? t : Number.MAX_SAFE_INTEGER;
+  };
+  const events = [...catalysts.events].sort((a, b) => sortKey(a.date) - sortKey(b.date));
   return (
     <div>
       <p className="mb-3 text-[12px] leading-relaxed text-gray-300">{catalysts.headline}</p>
@@ -264,6 +269,7 @@ export function ReportView({
           <SentimentBadge sentiment={report.stance} size="md" />
           <ConfidenceMeter value={report.confidence} />
           <span className="ml-auto font-mono text-[10px] text-gray-400">
+            {meta.cached && "cached · "}
             {fmtNyHm(Date.parse(meta.generatedAt))} ET · {(meta.latencyMs / 1000).toFixed(1)}s
           </span>
         </div>

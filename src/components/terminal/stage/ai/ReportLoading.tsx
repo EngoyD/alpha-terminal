@@ -32,8 +32,21 @@ function buildSteps(company: Company, model: string): Step[] {
   ];
 }
 
+/** Typical live-model latency; the progress bar eases toward it rather than finishing early. */
+const LIVE_EXPECTED_MS = 30_000;
+
 /** Terminal-style progress log shown while the report request is in flight. */
-export function ReportLoading({ company, startedAt, model }: { company: Company; startedAt: number; model: string }) {
+export function ReportLoading({
+  company,
+  startedAt,
+  model,
+  live,
+}: {
+  company: Company;
+  startedAt: number;
+  model: string;
+  live: boolean;
+}) {
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
@@ -43,7 +56,7 @@ export function ReportLoading({ company, startedAt, model }: { company: Company;
 
   const steps = useMemo(() => buildSteps(company, model), [company, model]);
   const visible = steps.filter((s) => s.at <= elapsed);
-  const progress = Math.min(0.96, elapsed / MIN_REPORT_MS);
+  const progress = live ? 0.96 * (1 - Math.exp(-elapsed / LIVE_EXPECTED_MS)) : Math.min(0.96, elapsed / MIN_REPORT_MS);
 
   return (
     <div role="status" aria-label={`Generating AI report for ${company.profile.ticker}`} className="flex min-h-0 flex-1 flex-col gap-3 p-3">
@@ -71,6 +84,7 @@ export function ReportLoading({ company, startedAt, model }: { company: Company;
       <div>
         <div className="flex justify-between font-mono text-[10px] text-gray-400 tabular-nums">
           <span>{Math.round(progress * 100)}%</span>
+          {live && <span className="text-purple-300/90">live model · usually 20–60s</span>}
           <span>{(elapsed / 1000).toFixed(1)}s</span>
         </div>
         <div className="mt-1 h-1 overflow-hidden rounded-full bg-gray-800">

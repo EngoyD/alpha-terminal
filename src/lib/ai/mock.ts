@@ -17,6 +17,8 @@ export async function generateMockEnvelope(ticker: string): Promise<AIReportEnve
       model: MOCK_MODEL,
       generatedAt: new Date().toISOString(),
       latencyMs: Date.now() - started,
+      cached: false,
+      cachedUntil: null,
     },
   };
 }

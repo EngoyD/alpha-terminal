@@ -75,7 +75,7 @@ export function TickerSearch({ onNavigate }: { onNavigate?: () => void }) {
           placeholder="Add ticker or company…"
           autoComplete="off"
           spellCheck={false}
-          className="min-w-0 flex-1 bg-transparent font-mono text-[12px] text-gray-100 uppercase placeholder:font-sans placeholder:text-gray-500 placeholder:normal-case focus:outline-none"
+          className="min-w-0 flex-1 bg-transparent font-mono text-[12px] text-gray-100 uppercase placeholder:font-sans placeholder:text-gray-400 placeholder:normal-case focus:outline-none"
         />
         <Kbd>/</Kbd>
       </div>
@@ -103,7 +103,7 @@ export function TickerSearch({ onNavigate }: { onNavigate?: () => void }) {
             >
               <span className="w-12 shrink-0 font-mono text-[12px] font-bold text-gray-100">{ticker}</span>
               <span className="min-w-0 flex-1 truncate text-[11px] text-gray-400">
-                {name} <span className="text-gray-500">· {exchange}</span>
+                {name} <span className="text-gray-400">· {exchange}</span>
               </span>
               {inList ? (
                 <span className="text-[10px] text-gray-400">View</span>

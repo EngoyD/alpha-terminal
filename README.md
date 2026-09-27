@@ -13,7 +13,11 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000.
+Open http://localhost:3000. Checks:
+
+```bash
+npm run lint && npm run typecheck && npm test
+```
 
 ## Layout
 
@@ -51,8 +55,9 @@ src/
     data/companies.ts             11 mock companies: profile, quote seed, fundamentals, news, discovery thesis
     market/                       seeded 1Y + intraday series, tick simulator, exchange sessions, tape alerts
     ai/schema.ts                  AIReport zod schema: types, validation and JSON Schema in one place
+    ai/config.ts                  provider, model and report-API settings
     ai/fixtures.ts, ai/mock.ts    canned reports and the mock provider
-    ai/server/                    Claude provider and provider switch (server only)
+    ai/server/                    Claude provider, shared report cache, rate limiter (server only)
 ```
 
 ## AI integration
@@ -62,15 +67,35 @@ The UI only consumes `AIReportEnvelope` from `POST /api/ai-report`. `src/lib/ai/
 Providers, selected with `AI_PROVIDER` (see `.env.example`):
 
 - `mock` (default): canned reports from `src/lib/ai/fixtures.ts` with about a second of simulated latency.
-- `anthropic`: set `AI_PROVIDER=anthropic` and `ANTHROPIC_API_KEY` in `.env.local`. Calls `claude-opus-5` with structured outputs, so the response has to match the schema, and opts into server-side fallbacks so a declined request is retried on another model. The prompt includes the ticker's snapshot from the mock data.
+- `anthropic`: set `AI_PROVIDER=anthropic` and `ANTHROPIC_API_KEY`. Calls `claude-opus-5` with structured outputs, so the response has to match the schema, and opts into server-side fallbacks so a declined request is retried on another model. The prompt includes the ticker's snapshot from the mock data. Without a key the app falls back to mock reports and logs a warning.
+
+Live reports cost money, so the route protects them:
+
+- Each ticker's report is generated at most once every 12 hours and shared by every visitor through the Next.js data cache (the Vercel Data Cache in production). The UI marks these reports as cached and disables Regenerate until the window ends.
+- Simultaneous requests for the same ticker share one model call.
+- Each client IP gets 20 requests per 10 minutes. This limit lives in memory per server instance, so it is best-effort; use a shared store such as Redis for a hard global limit.
 
 To add Gemini or another model, write a function that returns an `AIReport`, branch to it in `src/lib/ai/server/generate.ts`, and run the result through `AIReportSchema.parse` before returning it. `z.toJSONSchema(AIReportSchema)` produces the JSON Schema to hand to the provider's structured-output option.
 
-## Deploy (GitHub Pages)
+## Deploy
 
-`.github/workflows/pages.yml` deploys every push to `main`. It runs `npm run build:static`, which exports a static site to `out/` with the Pages base path (`/alpha-terminal`).
+### Vercel (full app, live Claude reports)
 
-GitHub Pages has no server, so the static build leaves out the API route: route handlers that need a server are named `route.api.ts`, and `next.config.ts` only includes that extension in server builds. On Pages the browser runs the mock AI provider itself. The Claude provider needs a server deployment (for example Vercel or `npm run build && npm start`).
+Import the repo in Vercel (or run `vercel --prod`) and set these environment variables for Production:
+
+| Variable | Value |
+| --- | --- |
+| `AI_PROVIDER` | `anthropic` |
+| `ANTHROPIC_API_KEY` | your Anthropic API key |
+| `REPORT_ALLOWED_ORIGINS` | `https://engoyd.github.io` (lets the Pages build call the API) |
+
+The report route sets `maxDuration = 300`, which covers a live model call.
+
+### GitHub Pages (static)
+
+`.github/workflows/pages.yml` runs lint, typecheck and tests, then deploys every push to `main`. It runs `npm run build:static`, which exports a static site to `out/` with the Pages base path (`/alpha-terminal`).
+
+GitHub Pages has no server, so the static build leaves out the API route: route handlers that need a server are named `route.api.ts`, and `next.config.ts` only includes that extension in server builds. If the repository variable `REPORT_API_URL` is set (for example `https://<your-vercel-domain>/api/ai-report`), the Pages build requests reports from that API. Otherwise, or if the API can't be reached, the browser runs the mock provider.
 
 ## Mock data notes
 

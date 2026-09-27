@@ -2,8 +2,10 @@
 
 import { Sparkles, Star } from "lucide-react";
 import type { ReactNode } from "react";
+import { useNow } from "@/hooks/useNow";
+import { reportLockedUntil } from "@/lib/ai/client";
 import { SERIES } from "@/lib/market/series";
-import { cn, fmtCompact, fmtNum, fmtPrice, fmtUsdCompact } from "@/lib/format";
+import { cn, fmtCompact, fmtNum, fmtNyHm, fmtPrice, fmtUsdCompact } from "@/lib/format";
 import type { Company } from "@/lib/types";
 import { useMarket, useTerminal } from "../TerminalProvider";
 import { Change, FlashPrice, Kbd, RangeBar } from "../ui/primitives";
@@ -27,7 +29,10 @@ export function TickerHero({ company, className }: { company: Company; className
   const pct = change / q.prevClose;
   const watched = watchlist.includes(profile.ticker);
   const pe = seed.epsTTM > 0 ? fmtNum(q.price / seed.epsTTM, 1) : "NM";
-  const reportState = reports[profile.ticker]?.status;
+  const report = reports[profile.ticker];
+  const reportState = report?.status;
+  const now = useNow();
+  const lockedUntil = report?.status === "ready" ? reportLockedUntil(report.envelope, now) : null;
 
   return (
     <section
@@ -93,11 +98,21 @@ export function TickerHero({ company, className }: { company: Company; className
       <button
         type="button"
         onClick={() => generateReport(profile.ticker)}
-        disabled={reportState === "loading"}
-        className="order-3 ml-auto inline-flex shrink-0 items-center gap-2 rounded-md border border-purple-400/40 bg-purple-500/15 px-3 py-1.5 text-xs font-medium text-purple-100 shadow-[0_0_24px_-8px] shadow-purple-500/60 transition hover:bg-purple-500/25 focus-visible:outline-2 focus-visible:outline-purple-400 disabled:cursor-progress disabled:opacity-70 2xl:order-4"
+        disabled={reportState === "loading" || lockedUntil !== null}
+        title={lockedUntil === null ? undefined : `Cached live report. Refreshes after ${fmtNyHm(lockedUntil)} ET.`}
+        className={cn(
+          "order-3 ml-auto inline-flex shrink-0 items-center gap-2 rounded-md border border-purple-400/40 bg-purple-500/15 px-3 py-1.5 text-xs font-medium text-purple-100 shadow-[0_0_24px_-8px] shadow-purple-500/60 transition hover:bg-purple-500/25 focus-visible:outline-2 focus-visible:outline-purple-400 disabled:opacity-70 2xl:order-4",
+          reportState === "loading" ? "disabled:cursor-progress" : "disabled:cursor-default",
+        )}
       >
         <Sparkles aria-hidden className={cn("size-3.5", reportState === "loading" && "animate-pulse")} />
-        {reportState === "loading" ? "Generating…" : reportState === "ready" ? "Regenerate" : "AI Report"}
+        {reportState === "loading"
+          ? "Generating…"
+          : lockedUntil !== null
+            ? "Cached"
+            : reportState === "ready"
+              ? "Regenerate"
+              : "AI Report"}
         <Kbd className="border-purple-400/30 bg-purple-500/10 text-purple-200">G</Kbd>
       </button>
     </section>

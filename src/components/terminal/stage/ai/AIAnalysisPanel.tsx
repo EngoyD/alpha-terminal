@@ -2,8 +2,10 @@
 
 import { BrainCircuit, CircleAlert, RefreshCw, Sparkles } from "lucide-react";
 import { useEffect, useEffectEvent, useState } from "react";
-import { MOCK_MODEL } from "@/lib/ai/config";
-import { cn } from "@/lib/format";
+import { useNow } from "@/hooks/useNow";
+import { reportLockedUntil } from "@/lib/ai/client";
+import { LIVE_REPORT_TTL_HOURS, MOCK_MODEL } from "@/lib/ai/config";
+import { cn, fmtNyHm } from "@/lib/format";
 import type { Company } from "@/lib/types";
 import { useTerminal } from "../../TerminalProvider";
 import { Panel } from "../../ui/Panel";
@@ -92,8 +94,10 @@ export function AIAnalysisPanel({ company, className }: { company: Company; clas
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
+  const now = useNow();
   const model = state?.status === "ready" ? state.envelope.meta.model : (aiInfo?.model ?? MOCK_MODEL);
   const reportKey = state?.status === "ready" ? `${ticker}:${state.envelope.meta.generatedAt}` : "";
+  const lockedUntil = state?.status === "ready" ? reportLockedUntil(state.envelope, now) : null;
 
   return (
     <Panel
@@ -110,10 +114,16 @@ export function AIAnalysisPanel({ company, className }: { company: Company; clas
             <button
               type="button"
               onClick={() => generateReport(ticker)}
-              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10.5px] font-medium text-purple-200 hover:bg-purple-500/15"
+              disabled={lockedUntil !== null}
+              title={
+                lockedUntil === null
+                  ? undefined
+                  : `Live reports are shared and cached for ${LIVE_REPORT_TTL_HOURS}h. Refreshes after ${fmtNyHm(lockedUntil)} ET.`
+              }
+              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10.5px] font-medium text-purple-200 hover:bg-purple-500/15 disabled:cursor-default disabled:text-gray-400 disabled:hover:bg-transparent"
             >
               <RefreshCw aria-hidden className="size-3" />
-              Regenerate
+              {lockedUntil === null ? "Regenerate" : `Cached · ${fmtNyHm(lockedUntil)}`}
             </button>
           )}
         </>
@@ -124,7 +134,7 @@ export function AIAnalysisPanel({ company, className }: { company: Company; clas
       </div>
       <div key={ticker} className={cn("flex min-h-0 flex-1 flex-col", state?.status !== "loading" && "animate-fade-in")}>
         {!state && <IdleState company={company} model={aiInfo?.model} onGenerate={() => generateReport(ticker)} />}
-        {state?.status === "loading" && <ReportLoading company={company} startedAt={state.startedAt} model={model} />}
+        {state?.status === "loading" && <ReportLoading company={company} startedAt={state.startedAt} model={model} live={aiInfo?.provider === "anthropic"} />}
         {state?.status === "error" && <ErrorState message={state.error} onRetry={() => generateReport(ticker)} />}
         {state?.status === "ready" && (
           <ReportView
