@@ -4,6 +4,8 @@ A single-screen research terminal prototype: watchlist, AI discovery, a simulate
 
 All market data is mock data. Nothing here is investment advice.
 
+Live demo: https://engoyd.github.io/alpha-terminal/
+
 ## Run
 
 ```bash
@@ -38,7 +40,7 @@ At 1280px and wider everything fits in one viewport and panels scroll internally
 src/
   app/
     page.tsx                      renders <TerminalApp /> (client-only, boot screen while loading)
-    api/ai-report/route.ts        GET: active provider/model. POST { ticker }: AIReportEnvelope
+    api/ai-report/route.api.ts    GET: active provider/model. POST { ticker }: AIReportEnvelope
   components/terminal/
     TerminalProvider.tsx          global state: selection, watchlist, reports, feed, discovery
     AlphaTerminal.tsx             shell, hotkeys, mobile drawer
@@ -49,7 +51,8 @@ src/
     data/companies.ts             11 mock companies: profile, quote seed, fundamentals, news, discovery thesis
     market/                       seeded 1Y + intraday series, tick simulator, exchange sessions, tape alerts
     ai/schema.ts                  AIReport zod schema: types, validation and JSON Schema in one place
-    ai/server/                    mock fixtures, Claude provider, provider switch
+    ai/fixtures.ts, ai/mock.ts    canned reports and the mock provider
+    ai/server/                    Claude provider and provider switch (server only)
 ```
 
 ## AI integration
@@ -58,10 +61,16 @@ The UI only consumes `AIReportEnvelope` from `POST /api/ai-report`. `src/lib/ai/
 
 Providers, selected with `AI_PROVIDER` (see `.env.example`):
 
-- `mock` (default): canned reports from `src/lib/ai/server/fixtures.ts` with about a second of simulated latency.
+- `mock` (default): canned reports from `src/lib/ai/fixtures.ts` with about a second of simulated latency.
 - `anthropic`: set `AI_PROVIDER=anthropic` and `ANTHROPIC_API_KEY` in `.env.local`. Calls `claude-opus-5` with structured outputs, so the response has to match the schema, and opts into server-side fallbacks so a declined request is retried on another model. The prompt includes the ticker's snapshot from the mock data.
 
 To add Gemini or another model, write a function that returns an `AIReport`, branch to it in `src/lib/ai/server/generate.ts`, and run the result through `AIReportSchema.parse` before returning it. `z.toJSONSchema(AIReportSchema)` produces the JSON Schema to hand to the provider's structured-output option.
+
+## Deploy (GitHub Pages)
+
+`.github/workflows/pages.yml` deploys every push to `main`. It runs `npm run build:static`, which exports a static site to `out/` with the Pages base path (`/alpha-terminal`).
+
+GitHub Pages has no server, so the static build leaves out the API route: route handlers that need a server are named `route.api.ts`, and `next.config.ts` only includes that extension in server builds. On Pages the browser runs the mock AI provider itself. The Claude provider needs a server deployment (for example Vercel or `npm run build && npm start`).
 
 ## Mock data notes
 

@@ -12,6 +12,7 @@ import {
   type ReactNode,
 } from "react";
 import { requestAIReport } from "@/lib/ai/client";
+import { MOCK_MODEL, STATIC_EXPORT } from "@/lib/ai/config";
 import type { AIReportEnvelope } from "@/lib/ai/schema";
 import { COMPANIES, DEFAULT_SELECTED, DEFAULT_WATCHLIST, isCovered } from "@/lib/data/companies";
 import { rankDiscovery } from "@/lib/discovery";
@@ -109,7 +110,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   const [watchlist, setWatchlist] = useState(prefs.watchlist);
   const [selected, setSelected] = useState(prefs.selected);
   const [reports, setReports] = useState<Record<string, ReportState>>({});
-  const [aiInfo, setAiInfo] = useState<AIInfo | null>(null);
+  const [aiInfo, setAiInfo] = useState<AIInfo | null>(STATIC_EXPORT ? { provider: "mock", model: MOCK_MODEL } : null);
   const [scanSeed, setScanSeed] = useState(1);
   const [scanning, setScanning] = useState(false);
   const [wire, setWire] = useState<Record<string, NewsItem[]>>({});
@@ -152,8 +153,9 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(id);
   }, []);
 
-  // Which provider/model the report route is configured for.
+  // Which provider/model the report route is configured for. Static builds have no route.
   useEffect(() => {
+    if (STATIC_EXPORT) return;
     const controller = new AbortController();
     fetch("/api/ai-report", { signal: controller.signal })
       .then((res) => (res.ok ? res.json() : null))

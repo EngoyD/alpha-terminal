@@ -1,10 +1,9 @@
-import "server-only";
-import type { AIReport } from "../schema";
+import type { AIReport } from "./schema";
 
 /**
- * Canned "model output" for the mock provider. It is served through the same
- * API route and schema validation a real LLM response would go through, so the
- * UI cannot tell the difference. Illustrative content only.
+ * Canned "model output" for the mock provider. It goes through the same schema
+ * validation a real LLM response would, so the UI cannot tell the difference.
+ * Illustrative content only.
  */
 const REPORTS: Record<string, AIReport> = {
   NVDA: {

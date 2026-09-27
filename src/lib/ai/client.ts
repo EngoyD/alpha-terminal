@@ -1,7 +1,14 @@
+import { STATIC_EXPORT } from "./config";
 import { AIReportEnvelopeSchema, type AIReportEnvelope } from "./schema";
 
-/** Calls the report route and validates the response against the shared schema. */
+/** Fetches a report from the API route (validated against the shared schema), or runs the mock locally on static builds. */
 export async function requestAIReport(ticker: string, signal?: AbortSignal): Promise<AIReportEnvelope> {
+  if (STATIC_EXPORT) {
+    // Static hosting has no API route; load the mock provider on demand and run it here.
+    const { generateMockEnvelope } = await import("./mock");
+    return generateMockEnvelope(ticker);
+  }
+
   const res = await fetch("/api/ai-report", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

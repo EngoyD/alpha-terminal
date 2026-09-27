@@ -2,6 +2,7 @@
 
 import { BrainCircuit, CircleAlert, RefreshCw, Sparkles } from "lucide-react";
 import { useEffect, useEffectEvent, useState } from "react";
+import { MOCK_MODEL } from "@/lib/ai/config";
 import { cn } from "@/lib/format";
 import type { Company } from "@/lib/types";
 import { useTerminal } from "../../TerminalProvider";
@@ -91,7 +92,7 @@ export function AIAnalysisPanel({ company, className }: { company: Company; clas
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  const model = state?.status === "ready" ? state.envelope.meta.model : (aiInfo?.model ?? "alpha-mock-v2");
+  const model = state?.status === "ready" ? state.envelope.meta.model : (aiInfo?.model ?? MOCK_MODEL);
   const reportKey = state?.status === "ready" ? `${ticker}:${state.envelope.meta.generatedAt}` : "";
 
   return (
